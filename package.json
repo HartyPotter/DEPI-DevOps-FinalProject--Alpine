@@ -1,0 +1,11 @@
+{
+  "name": "testdockerbuild",
+  "private": true,
+  "version": "0.1",
+  "description": "Demo app for web container demonstrations",
+  "main": "app.js",
+  "dependencies": {
+    "express": "4.19.2",
+    "pug": "3.0.2"
+  }
+}
