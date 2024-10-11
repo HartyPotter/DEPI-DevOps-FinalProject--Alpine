@@ -23,7 +23,7 @@ pipeline {
                 script {
                     echo 'Pushing to Docker Hub...'
                     // withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        sh 'echo "$DOCKER_HUB_PASS" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin docker.io; docker push ${DOCKER_HUB_USERNAME}/${APP_NAME}:latest'
+                        sh 'echo "$DOCKER_HUB_PASS" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin docker.io; docker push ${APP_NAME}:latest'
                     }
                 }
             }
