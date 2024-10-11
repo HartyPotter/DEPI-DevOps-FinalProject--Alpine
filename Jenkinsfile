@@ -25,7 +25,7 @@ pipeline {
                     // withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         sh """
                             echo "$DOCKER_HUB_PASS" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
-                            docker push ${DOCKER_HUB_USERNAME}/DEPI_Final:latest
+                            docker push ${DOCKER_HUB_USERNAME}/depi_final:latest
                         """
                     }
                 }
@@ -40,7 +40,7 @@ pipeline {
                 script {
                     echo 'Pulling docker image on another agent...'
                     sh """
-                        docker pull ${DOCKER_HUB_USERNAME}/DEPI_Final:latest
+                        docker pull ${DOCKER_HUB_USERNAME}/depi_final:latest
                     """
                 }
             }
@@ -54,7 +54,7 @@ pipeline {
                 script {
                     echo 'Running Docker container...'
                     sh """
-                        docker run -d --name ${APP_NAME} -p ${APP_PORT}:8080 ${DOCKER_HUB_USERNAME}/DEPI_Final:latest
+                        docker run -d --name ${APP_NAME} -p ${APP_PORT}:8080 ${DOCKER_HUB_USERNAME}/depi_final:latest
                     """
                 }
             }
