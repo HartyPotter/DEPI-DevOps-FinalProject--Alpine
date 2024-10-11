@@ -23,10 +23,7 @@ pipeline {
                 script {
                     echo 'Pushing to Docker Hub...'
                     // withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        sh '
-                            echo "$DOCKER_HUB_PASS" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
-                            docker push ${APP_NAME}:latest
-                        '
+                        sh 'echo "$DOCKER_HUB_PASS" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin; docker push ${APP_NAME}:latest'
                     }
                 }
             }
@@ -39,9 +36,7 @@ pipeline {
             steps {
                 script {
                     echo 'Pulling docker image on another agent...'
-                    sh '
-                        docker pull ${APP_NAME}:latest
-                    '
+                    sh 'docker pull ${APP_NAME}:latest'
                 }
             }
         }
@@ -53,9 +48,7 @@ pipeline {
             steps {
                 script {
                     echo 'Running Docker container...'
-                    sh '
-                        docker run -d --name ${APP_NAME} -p ${APP_PORT}:8080 ${APP_NAME}:latest
-                    '
+                    sh 'docker run -d --name ${APP_NAME} -p ${APP_PORT}:8080 ${APP_NAME}:latest'
                 }
             }
         }
@@ -67,10 +60,7 @@ pipeline {
             steps {
                 script {
                     echo 'Checking connectivity using curl...'
-                    sh '
-                        sleep 10
-                        curl --fail http://localhost:${APP_PORT} || exit 1
-                    '
+                    sh 'sleep 10; curl --fail http://localhost:${APP_PORT} || exit 1'
                 }
             }
         }
