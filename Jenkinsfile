@@ -48,7 +48,7 @@ pipeline {
             steps {
                 script {
                     echo 'Running Docker container...'
-                    sh 'docker run -d --name ${APP_NAME} -p ${APP_PORT}:8080 ${APP_NAME}:latest'
+                    sh 'docker run -d --name ${APP_NAME} -p ${APP_PORT}:8080 ${DOCKER_HUB_USERNAME}/${APP_NAME}:latest'
                 }
             }
         }
