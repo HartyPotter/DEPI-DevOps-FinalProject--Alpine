@@ -36,7 +36,7 @@ pipeline {
             steps {
                 script {
                     echo 'Pulling docker image on another agent...'
-                    sh 'docker pull ${APP_NAME}:latest'
+                    sh 'docker pull ${DOCKER_HUB_USERNAME}/${APP_NAME}:latest'
                 }
             }
         }
