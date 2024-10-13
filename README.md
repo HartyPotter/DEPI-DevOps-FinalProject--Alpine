@@ -1,31 +1,29 @@
 # DevOps Project: Jenkins Pipeline
 
 We started by building the Jenkins pipeline (attached in the repo). Here is a breakdown of the file:
-
-The Jenkinsfile begins by defining the environment variables that we will be using. The variables are as follows:
+The Jenkins file started first by defining the environment variables that we will be using. The variables are as follows:
 - Docker Hub Username
-- Docker Hub Password (After learning about HashiVaults and GitHub Secrets, we still hardcoded passwords. Some lessons are learned the hard way :) )
+- Docker Hub Password (After learning about HashiVaults and GitHub Secrets we still hardcode passwords. Somethings are learned the hard way :) )
 - App Name
 - App Port
 
-Then, the file describes the Jenkins pipeline. The pipeline consists of five stages:
-1. Building the Docker image from the Node application
-2. Pushing the image to our DockerHub account
-3. Pulling the image on another Jenkins agent (Jenkins worker)
-4. Running the application in the built container on the agent
-5. Verifying the application works by using the `curl` command on the container
+Then the file describes the Jenkins pipeline. The pipeline consists of five stages:
+1. Building the docker image from the node application
+2. Pushing to our DockerHub account
+3. Pulling the agent on another Jenkins agent (Jenkins worker)
+4. Running the application on the built container on the agent
+5. Checking the application works by using the `curl` command on the container
 
-### Steps Taken
+We will discuss the steps taken to achieve these steps. On an ubuntu virtual machine, we created the Jenkins master agent and created a pipeline that is dependent on the GitHub repo main branch. We also created our DockerHub account. We tested the pipeline at this stage (still no agent to pull the image), and it was successfully able to build the image as well as push the image to DockerHub. The next step was to create the Jenkins agent on another VM and pull the image. However, we thought this will be an easy task! We decided to make it a little bit harder. We decided to choose a docker container to represent our Jenkins agent (and here’s how we lost two days of debugging). Issues we ran through:
 
-On an Ubuntu virtual machine, we created the Jenkins master agent and set up a pipeline that is dependent on the GitHub repo's main branch. We also created our DockerHub account. We tested the pipeline at this stage (still no agent to pull the image), and it successfully built the image and pushed it to DockerHub.
+1. **Connecting to Jenkins agent:**
 
-The next step was to create the Jenkins agent on another VM and pull the image. However, we thought this would be an easy task! We decided to make it a little harder by choosing a Docker container to represent our Jenkins agent (and here's how we lost two days debugging). Here are the issues we encountered:
+    We pulled the [Jenkins official image](https://hub.docker.com/r/jenkins/jenkins) and ran the container. We thought that the Jenkins master will be able to reach the Jenkins agent using the container IP address only. After several tries, we came through this [tutorial](https://www.jenkins.io/doc/book/using/using-agents/) which discusses that you don’t actually need Jenkins itself running on the Jenkins agent, you only need the JDK. We downloaded the [Jenkins agent](https://hub.docker.com/r/jenkins/ssh-agent) official image, generated a pair of ssh keys, and ran it with the public key as an environment variable.
 
-1. **Connecting to Jenkins agent**:  
-   We pulled the official Jenkins image and ran the container, assuming the Jenkins master could reach the Jenkins agent using just the container's IP address. After several attempts, we found a tutorial explaining that Jenkins doesn't actually need to run on the agent. Only the JDK is required. We downloaded the official Jenkins agent image, generated a pair of SSH keys, and ran the container with the public key as an environment variable.
+2. **SSH Connection problem:**
 
-2. **SSH Connection Problem**:  
-   The Jenkins master was now able to detect the agent, but we faced multiple "SSH: Connection Refused" issues. After multiple key pair checks, the issue was traced to not including the host part in the SSH public key environment variable passed to the container. Once we fixed that, "Connection Refused" persisted. After generating and deleting old keys several times, we ensured the pairs matched. The problem was Jenkins only uses the first SSH key generated on the machine by default. After deleting all keys (including those on the VM), Jenkins was able to connect to its agent.
+    The Jenkins master now was able to detect the agent. However, things don’t ever go easy. We ran through multiple “SSH: Connection Refused” issues. We got into multiple tries of checking the pair of keys generated. At first, we had the issue of not including the host part at the end of the SSH public key env variable given to the container. Solving this, the console still outputting “Connection Refused”. We generated and deleted the old keys (multiple times) to ensure the pair of keys used are matching. However, this was not the case and all the key pairs were actually matching. We confirmed this by SSHing the container using the terminal (outside of Jenkins). At this point, we were running crazy. The issue turned out to be that Jenkins doesn’t loop through the SSH keys on the machine. It only tries the [standard SSH key](https://askubuntu.com/questions/4830/easiest-way-to-copy-ssh-keys-to-another-machine), which is the first SSH key generated on the machine (with default settings). After deleting all keys already generated (including all the keys already on the VM), we were able to make Jenkins reach its agent.
 
-3. **Running Docker inside Docker (DinD)**:  
-   The `docker pull` command didn't work inside the container. Jenkins returned the error "docker command not found." The issue stemmed from using an Alpine-based image. After attempts to install `apt`, we discovered that Alpine uses its package manager, `apk`. We installed Docker using `apk add docker`, but then faced a "Cannot reach docker daemon" error, as the service wasn't running. This time, we switched to a Debian-based Jenkins agent image, which made installing Docker and managing the daemon (`dockerd`) much easier. Finally, we got the Jenkins agent to run Docker and pull the image.
+3. **Running Docker inside Docker (AKA [DinD](https://hub.docker.com/_/docker)):**
+
+    Of course, the `docker pull` command won’t run itself on the container. The Jenkins master told us this the hard way (“docker command is not found”) with its devil face (image). We tried to install docker on the Jenkins agent container but of course, “apt-get is not found”. The image we’re using is based on alpine. After several trials to install `apt`, we finally came across a blog that says alpine has its package manager too `apk`. We installed docker using `apk add docker`. It was fine until we realized that “Cannot reach docker daemon”. We realized that the service is not working. We took the easy way this time and transitioned to another [Jenkins agent image based on Debian](https://hub.docker.com/layers/jenkins/ssh-agent/latest-debian-jdk17/images/sha256-95b2fe5b6a42c924823fc45850c6c1babb38d4db3b4f6c5736b92665d980e256?context=explore). It made our life much easier using `apt-get` and `systemctl` commands. We also realized that `dockerd` is the new “docker daemon” we’re dealing with. Finally, we were able to get the Jenkins agent running docker and pulling the image.
