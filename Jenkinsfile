@@ -2,8 +2,9 @@ pipeline {
     agent any
     
     environment {
-        DOCKER_HUB_USERNAME = "joebeanzz123"
-        DOCKER_HUB_PASS = "fightitasdf@1234"
+        DOCKER-HUB-CREDS = credentials('DOCKER-HUB-CREDS')
+        // DOCKER_HUB_USERNAME = "joebeanzz123"
+        // DOCKER_HUB_PASS = "fightitasdf@1234"
         APP_NAME = "node-app"
         APP_PORT = 9090
     }
@@ -22,8 +23,7 @@ pipeline {
             steps {
                 script {
                     echo 'Pushing to Docker Hub...'
-                    // withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        sh 'echo ${DOCKER_HUB_PASS} | docker login -u ${DOCKER_HUB_USERNAME} --password-stdin docker.io; docker tag ${APP_NAME}:latest ${DOCKER_HUB_USERNAME}/${APP_NAME}:latest; docker push ${DOCKER_HUB_USERNAME}/${APP_NAME}:latest'
+                        sh 'echo ${DOCKER-HUB-CREDS_PSW} | docker login -u ${DOCKER-HUB-CREDS_USR} --password-stdin docker.io; docker tag ${APP_NAME}:latest ${DOCKER-HUB-CREDS_USR}/${APP_NAME}:latest; docker push ${DOCKER-HUB-CREDS_USR}/${APP_NAME}:latest'
                     }
                 }
             }
@@ -31,7 +31,7 @@ pipeline {
 
         stage('Pull image on agent') {
             agent {
-                label 'remote-agent'
+                label 'docker-agent'
             }
             steps {
                 script {
@@ -43,7 +43,7 @@ pipeline {
 
         stage('Run docker image') {
             agent {
-                label 'remote-agent'
+                label 'docker-agent'
             }
             steps {
                 script {
@@ -55,7 +55,7 @@ pipeline {
 
         stage('Check connection') {
             agent {
-                label 'remote-agent'
+                label 'docker-agent'
             }
             steps {
                 script {

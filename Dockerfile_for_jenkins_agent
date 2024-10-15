@@ -1,16 +1,21 @@
-# Use the Jenkins SSH agent image with Debian and JDK 17 as the base
-FROM jenkins/ssh-agent:latest-debian-jdk17
+# Use the Jenkins SSH agent as the base image
+FROM jenkins/ssh-agent:alpine-jdk17
 
-# Install Docker dependencies
-RUN apt-get update && apt-get install -y \
-    docker.io \
-    && apt-get clean
+# Switch to the root user to install Docker
+USER root
 
-# Enable Docker to start on boot
-RUN systemctl enable docker
+# Install Docker
+RUN apk update && \
+    apk add --no-cache docker
 
-# Verify Docker installation by checking the version
-RUN docker --version
+# Create add jenkins user to the docker group
+RUN addgroup jenkins docker
 
-# Expose SSH port
+# Switch back to the jenkins user
+USER jenkins
+
+# Expose port 22 for SSH
 EXPOSE 22
+
+# Start Docker daemon in the background and keep the container running
+CMD ["sh", "-c", "dockerd & sleep 5 && tail -f /dev/null"]
