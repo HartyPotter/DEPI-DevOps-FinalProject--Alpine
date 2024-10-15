@@ -11,7 +11,7 @@ cat ~/.ssh/docker-agent
 # 3. Build the Docker image
 echo "Building Docker image..."
 cd proj
-docker build -t docker-agent .
+docker build --no-cache -t docker-agent .
 
 # 4. Run the Docker container with the public key
 PUBLIC_KEY=$(cat /root/.ssh/docker-agent.pub)
