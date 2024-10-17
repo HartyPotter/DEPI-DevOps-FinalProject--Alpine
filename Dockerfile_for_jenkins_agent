@@ -1,21 +1,18 @@
 # Use the Jenkins SSH agent as the base image
 FROM jenkins/ssh-agent:alpine-jdk17
 
-# Switch to the root user to install Docker
+# Switch to the root user to install Docker and other services
 USER root
 
 # Install Docker
-RUN apk update && \
-    apk add --no-cache docker
+RUN apk update
+RUN apk add --update docker
 
-# Create add jenkins user to the docker group
+# Create the docker group (in case it's not created by default) and add jenkins to it
 RUN addgroup jenkins docker
 
-# Switch back to the jenkins user
+# Switch back to the Jenkins user
 USER jenkins
-
-# Expose port 22 for SSH
-EXPOSE 22
 
 # Start Docker daemon in the background and keep the container running
 CMD ["sh", "-c", "dockerd & sleep 5 && tail -f /dev/null"]

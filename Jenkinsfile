@@ -2,9 +2,7 @@ pipeline {
     agent any
     
     environment {
-        DOCKER-HUB-CREDS = credentials('DOCKER-HUB-CREDS')
-        // DOCKER_HUB_USERNAME = "joebeanzz123"
-        // DOCKER_HUB_PASS = "fightitasdf@1234"
+        DOCKER_HUB_CREDS = credentials('DOCKER_HUB_CREDS')
         APP_NAME = "node-app"
         APP_PORT = 9090
     }
@@ -23,7 +21,7 @@ pipeline {
             steps {
                 script {
                     echo 'Pushing to Docker Hub...'
-                        sh 'echo ${DOCKER-HUB-CREDS_PSW} | docker login -u ${DOCKER-HUB-CREDS_USR} --password-stdin docker.io; docker tag ${APP_NAME}:latest ${DOCKER-HUB-CREDS_USR}/${APP_NAME}:latest; docker push ${DOCKER-HUB-CREDS_USR}/${APP_NAME}:latest'
+                        sh 'echo ${DOCKER_HUB_CREDS_PSW} | docker login -u ${DOCKER_HUB_CREDS_USR} --password-stdin docker.io; docker tag ${APP_NAME}:latest ${DOCKER_HUB_CREDS_USR}/${APP_NAME}:latest; docker push ${DOCKER_HUB_CREDS_USR}/${APP_NAME}:latest'
                     }
                 }
             }
@@ -36,7 +34,7 @@ pipeline {
             steps {
                 script {
                     echo 'Pulling docker image on another agent...'
-                    sh 'docker pull ${DOCKER_HUB_USERNAME}/${APP_NAME}:latest'
+                    sh 'docker pull ${DOCKER_HUB_CREDS_USR}/${APP_NAME}:latest'
                 }
             }
         }
@@ -48,7 +46,7 @@ pipeline {
             steps {
                 script {
                     echo 'Running Docker container...'
-                    sh 'docker run --rm -d --name ${APP_NAME} -p ${APP_PORT}:${APP_PORT} ${DOCKER_HUB_USERNAME}/${APP_NAME}:latest'
+                    sh 'docker run --rm -d --name ${APP_NAME} -p ${APP_PORT}:${APP_PORT} ${DOCKER_HUB_CREDS_USR}/${APP_NAME}:latest'
                 }
             }
         }

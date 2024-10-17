@@ -11,13 +11,13 @@ cat ~/.ssh/docker-agent
 # 3. Build the Docker image
 echo "Building Docker image..."
 cd proj
-docker build --no-cache -t docker-agent .
+docker build --no-cache -t docker-agent-image .
 
 # 4. Run the Docker container with the public key
 PUBLIC_KEY=$(cat /root/.ssh/docker-agent.pub)
 
 echo "Running Docker container with the public key..."
 docker run -td --privileged -p 7777:22 --name docker-agent -v /var/run/docker.sock:/var/run/docker.sock \
-       -e "JENKINS_AGENT_SSH_PUBKEY=${PUBLIC_KEY}" docker-agent
+       -e "JENKINS_AGENT_SSH_PUBKEY=${PUBLIC_KEY}" docker-agent-image
 
 echo "Jnekins Docker agent started."
