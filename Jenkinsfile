@@ -52,9 +52,9 @@ pipeline {
         }
 
         stage('Check connection') {
-            agent {
-                label 'docker-agent'
-            }
+            // agent {
+            //     label 'docker-agent'
+            // }
             steps {
                 script {
                     echo 'Checking connectivity using curl...'
