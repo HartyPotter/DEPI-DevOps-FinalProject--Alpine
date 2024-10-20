@@ -1,35 +1,56 @@
-# DevOps Project: Jenkins Pipeline
+# The Alpine Journey
 
-We started by building the Jenkins pipeline (attached in the repo). Here is a breakdown of the file:
-The Jenkins file started first by defining the environment variables that we will be using. The variables are as follows:
-- Docker Hub Username
-- Docker Hub Password (After learning about HashiVaults and GitHub Secrets we still hardcode passwords. Somethings are learned the hard way :) )
-- App Name
-- App Port
+As a perfectionist (Please, HELP!), I noticed that the Jenkins agent image based on Alpine took up nearly 800 MB of space and required 15 minutes of build time. Naturally, I took it as a challenge to make the agent work on an Alpine image, reducing the image size to just 130 MB and the build time to under 3 minutes!
 
-Then the file describes the Jenkins pipeline. The pipeline consists of five stages:
-1. Building the docker image from the node application
-2. Pushing to our DockerHub account
-3. Pulling the agent on another Jenkins agent (Jenkins worker)
-4. Running the application on the built container on the agent
-5. Checking the application works by using the `curl` command on the container
+The plan was similar to the original approach: create a Jenkins controller (master agent) to handle the Docker image building and an additional Jenkins agent with Docker installed. This would allow the master agent to delegate the work of pulling the image and starting the application to the agent.
 
-We will discuss the steps taken to achieve these steps. On an ubuntu virtual machine, we created the Jenkins master agent and created a pipeline that is dependent on the GitHub repo main branch. We also created our DockerHub account. We tested the pipeline at this stage (still no agent to pull the image), and it was successfully able to build the image as well as push the image to DockerHub. The next step was to create the Jenkins agent on another VM and pull the image. However, we thought this will be an easy task! We decided to make it a little bit harder. We decided to choose a docker container to represent our Jenkins agent (and here’s how we lost two days of debugging). Issues we ran through:
+Now, let's dive into the challenges—grab your popcorn and favorite drink because this is going to take a while.
 
-1. **Connecting to Jenkins agent:**
+## Challenges
 
-    We pulled the [Jenkins official image](https://hub.docker.com/r/jenkins/jenkins) and ran the container. We thought that the Jenkins master will be able to reach the Jenkins agent using the container IP address only. After several tries, we came through this [tutorial](https://www.jenkins.io/doc/book/using/using-agents/) which discusses that you don’t actually need Jenkins itself running on the Jenkins agent, you only need the JDK. We downloaded the [Jenkins agent](https://hub.docker.com/r/jenkins/ssh-agent) official image, generated a pair of ssh keys, and ran it with the public key as an environment variable.
+Most of these challenges arose from redoing much of the work that the original image should have handled. Let’s break it down.
 
-2. **SSH Connection problem:**
+### 1. SSH Connection and Daemon Process
 
-    The Jenkins master now was able to detect the agent. However, things don’t ever go easy. We ran through multiple “SSH: Connection Refused” issues. We got into multiple tries of checking the pair of keys generated. At first, we had the issue of not including the host part at the end of the SSH public key env variable given to the container. Solving this, the console still outputting “Connection Refused”. We generated and deleted the old keys (multiple times) to ensure the pair of keys used are matching. However, this was not the case and all the key pairs were actually matching. We confirmed this by SSHing the container using the terminal (outside of Jenkins). At this point, we were running crazy. The issue turned out to be that Jenkins doesn’t loop through the SSH keys on the machine. It only tries the [standard SSH key](https://askubuntu.com/questions/4830/easiest-way-to-copy-ssh-keys-to-another-machine), which is the first SSH key generated on the machine (with default settings). After deleting all keys already generated (including all the keys already on the VM), we were able to make Jenkins reach its agent.
+One of the first problems was getting the Jenkins controller to connect to the Docker agent. After resolving some initial issues related to missing parts of the SSH key, I encountered additional problems with the Alpine SSH agent image:
 
-3. **Running Docker inside Docker (AKA [DinD](https://hub.docker.com/_/docker)):**
+- **Connection reset by peer:**  
+  This was caused by the container exiting immediately due to the main process failing or no entry point being executed.  
+  **Solution:** Setting up SSH and manually running the SSH daemon in the Dockerfile entry point using `docker_entrypoint.sh`.  
+  **Ref:**  
+  - [Stack Overflow #1](https://stackoverflow.com/questions/35690954/running-openssh-in-an-alpine-docker-container)  
+  - [Stack Overflow #2](https://stackoverflow.com/questions/69394001/how-can-i-fix-kex-exchange-identification-read-connection-reset-by-peer)
 
+- **No Host Keys Found:**  
+  When I overwrote the original SSH agent image, the host keys for the SSH server (Jenkins agent) were not being generated. When the Jenkins controller attempted to connect, it couldn’t find any host keys, causing the connection to fail.  
+  **Solution:** Generated SSH host keys during the Docker build step using `ssh-keygen -A`.  
+  **Ref:**  
+  - [Unix Stack Exchange](https://unix.stackexchange.com/questions/642824/ssh-fails-to-start-due-to-missing-host-keys)  
+  - [Stack Overflow #3](https://stackoverflow.com/questions/74040682/why-docker-doesnt-see-the-hostkeys-sshd-no-hostkeys-available-exiting)
 
-    <p align="center">
-      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQPuyfU5OTBD2mIefOd0TxKu5SB9fLhodMgwg&s" alt="Jenkins using Docker"/>
-    </p>
+- **ERROR: Server rejected the private key(s) for user:**  
+  This occurred because the SSH private key was generated in the wrong format and type.  
+  **Solution:** Used RSA instead of ed25519 and ensured the key was in PEM format, as Jenkins expected.  
+  **Ref:**  
+  - [Stack Overflow #4](https://stackoverflow.com/questions/31044704/this-node-is-offline-because-jenkins-failed-to-launch-the-slave-agent-on-it)
 
-   
-    Of course, the `docker pull` command won’t run itself on the container. The Jenkins master told us this the hard way (“docker command is not found”) with its devil face. We tried to install docker on the Jenkins agent container but of course, “apt-get is not found”. The image we’re using is based on alpine. After several trials to install `apt`, we finally came across a blog that says alpine has its package manager too `apk` (How lucky we are). We installed docker using `apk add docker`. We were just fine until it hit us with “Cannot reach docker daemon”. We realized that the service is not working. We took the easy way this time and transitioned to another [Jenkins agent image based on Debian](https://hub.docker.com/layers/jenkins/ssh-agent/latest-debian-jdk17/images/sha256-95b2fe5b6a42c924823fc45850c6c1babb38d4db3b4f6c5736b92665d980e256?context=explore). It made our life much easier using `apt-get` and `systemctl` commands. We also realized that `dockerd` is the new “docker daemon” we’re dealing with. Finally, we were able to get the Jenkins agent running docker and pulling the image.
+With SSH keys successfully generated, we moved on to Docker-related challenges.
+
+### 2. Docker
+
+I initially intended to run a full Docker daemon in the container, but encountered numerous connection and process issues. In the end, I opted to install only the Docker CLI and bind the host’s Docker socket to the container.
+
+This isn't the ideal solution for a few reasons:
+- **Dependency on host Docker:** This setup requires Docker to be running on the host, which isn’t always guaranteed.
+- **Security concerns:** The Jenkins user in the container would have root privileges on the host, which is not the most secure approach.
+
+Despite resolving several permission issues, Docker still didn’t work properly. The problem stemmed from the mismatch between the container's Docker group ID and the host's Docker group ID. For users in the container to interact with the Docker process on the host, their group IDs need to match.
+
+**Solution:** I manually matched the group IDs, though there’s probably a better solution involving Docker’s user namespaces, which handle user and group ID mapping. However, it didn’t seem worth pursuing further at this point.
+
+**Ref:**  
+- [Stack Overflow #5](https://stackoverflow.com/questions/36185035/how-to-mount-docker-socket-as-volume-in-docker-container-with-correct-group)
+
+### Conclusion
+
+While this journey was challenging, it was a valuable learning experience. I gained a deeper understanding of SSH, building Dockerfiles, working with the Alpine environment, and managing Jenkins agents.

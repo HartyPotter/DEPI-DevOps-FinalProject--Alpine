@@ -2,22 +2,35 @@
 
 # 1. Generate SSH Key
 echo "Generating SSH key..."
-ssh-keygen -f ~/.ssh/docker-agent -N "" <<< y >/dev/null 2>&1
+ssh-keygen -t rsa -m PEM -f ~/.ssh/docker_agent_key -N "" <<< y >/dev/null 2>&1
 
 # 2. Output the private key
-echo "Private Key:"
-cat ~/.ssh/docker-agent
+echo "Private Key:-----------------"
+cat ~/.ssh/docker_agent_key
 
-# 3. Build the Docker image
+# 3. Get the Group ID of the docker group of the host
+DOCKER_GID=$(getent group docker | cut -d: -f3)
+
+if [ -z "$DOCKER_GID" ]; then
+        echo "Error getting host's docker group ID. Make sure Docker is installe                        d and running then try again."
+        exit 1
+else \
+        echo ${DOCKER_GID}
+fi
+
+# 4. Build the Docker image
 echo "Building Docker image..."
-cd proj
-docker build --no-cache -t docker-agent-image .
 
-# 4. Run the Docker container with the public key
-PUBLIC_KEY=$(cat /root/.ssh/docker-agent.pub)
+docker build --build-arg DOCKER_GID="${DOCKER_GID}" -t docker-agent-image .
 
-echo "Running Docker container with the public key..."
-docker run -td --privileged -p 7777:22 --name docker-agent -v /var/run/docker.sock:/var/run/docker.sock \
-       -e "JENKINS_AGENT_SSH_PUBKEY=${PUBLIC_KEY}" docker-agent-image
+# 5. Set the public key as environment variable
+PUBLIC_KEY=$(cat ~/.ssh/docker_agent_key.pub)
 
-echo "Jnekins Docker agent started."
+# 6. Output the public key
+echo "Public Key:------------------"
+cat ~/.ssh/docker_agent_key.pub
+
+# 7. Run the container with the public key
+echo "Running Docker container on port 7777..."
+docker run -td --privileged -p 7777:22 --name docker-agent -v /var/run/docker.so                        ck:/var/run/docker.sock \
+       -e "JENKINS_AGENT_SSH_PUBKEY=${PUBLIC_KEY}" docker-agent-image && echo "J                        enkins Docker agent started."

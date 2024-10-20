@@ -1,18 +1,51 @@
 # Use the Jenkins SSH agent as the base image
 FROM jenkins/ssh-agent:alpine-jdk17
 
+# Switch the defualt shell from /bin/sh to /bin/bash
+SHELL ["/bin/bash", "-c"]
+
 # Switch to the root user to install Docker and other services
 USER root
 
 # Install Docker
-RUN apk update
-RUN apk add --update docker
+RUN apk update && apk add --update docker curl
 
-# Create the docker group (in case it's not created by default) and add jenkins to it
-RUN addgroup jenkins docker
+# Create the docker group and add Jenkins to it
+ARG DOCKER_GID
+
+#RUN addgroup -g ${DOCKER_GID} docker
+
+RUN { \
+    if getent group docker; then \
+        EXISTING_GID=$(getent group docker | cut -d: -f3); \
+        if [ "$EXISTING_GID" != "$DOCKER_GID" ]; then \
+                echo "Changing docker group in the container from $EXISTING_GID                         to $DOCKER_GID"; \
+                sed -i "s/^docker:x:$EXISTING_GID:/docker:x:${DOCKER_GID}:/" /et                        c/group; \
+        fi; \
+    else \
+        echo "Docker group does not exist. Creating it..."; \
+        addgroup -g ${DOCKER_GID} docker; \
+    fi; \
+    }
+
+# Add the jenkins user to the docker group
+RUN addgroup jenkins docker || echo "Jenkins user already in docker group."
 
 # Switch back to the Jenkins user
 USER jenkins
 
-# Start Docker daemon in the background and keep the container running
-CMD ["sh", "-c", "dockerd & sleep 5 && tail -f /dev/null"]
+# Expose SSH port
+EXPOSE 22
+
+# Add entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin
+
+# Make entrypoint script executable
+USER root
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Set entrypoint to the script
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+# Default command to keep SSH running
+CMD ["/usr/sbin/sshd","-D"]
